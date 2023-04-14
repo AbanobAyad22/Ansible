@@ -1,5 +1,0 @@
-- name: play1
-  hosts: web-servers
-  gather_facts: false  
-  roles:
-    - web
