@@ -3,3 +3,4 @@
   templates
   handlers
   loops
+  vars
