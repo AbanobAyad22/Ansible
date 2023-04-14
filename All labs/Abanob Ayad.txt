@@ -1,0 +1,378 @@
+				Abanob Ayad
+			       -------------
+1/update         apt update -y
+2/vim            apt install vim
+3/ssh            apt install ssh
+4/enable ssh     service ssh start
+5/ansible        apt install ansible
+6/enable ansible systemctl start ansible
+---------------------------------------------------------
+cd ~/.ssh
+-------------------------------------------------------
+1/generate key public and private
+------------------------------
+ssh-keygen -t rsa
+/home/abanob/.ssh/master
+
+
+
+
+2/copy public key from master to paste in host
+------------------------
+ssh-copy-id -i devops.pub root@172.17.0.2 -f
+-----------
+
+
+
+3/ssh to the machine
+---------------------
+ssh ansible@172.17.0.2 -i dev
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+setup 
+-----
+ansible all -i 172.17.0.3, --private-key ~/.ssh/dev -u ansible -m ping  
+ansible all -i 172.17.0.3, --private-key ~/.ssh/dev -u ansible -m command -a "echo hi"
+
+
+
+
+ssh ansible@3.87.24.251 -i ~/.ssh/dev -o 'apt install nginx'
+--------------------------------------
+--------------------------------------
+--------------------------------------
+inventory
+---------
+list of ips
+
+
+
+1/mkdir m
+cd m
+2/touch inventory
+3/vim inventory
+----
+[web-servers]
+172.17.0.3
+--------------
+ansible web-servers -i  inventory --private-key ~/.ssh/dev -u ansible -m command -a "touch hello"
+----------------------------------------------------------------------------------------------------
+---------------------------------------------
+---------------------------------------------
+---------------------------------------------
+---------------------------------------------
+configuration file|
+-------------------
+1/env var "ANSIBLE_CONFIG"
+2/in current dir "ansible.cfg"
+3/hi home directory ".ansible.cfg"
+
++------------------------------------------------+
+in current dir
+--------------
+1/vim ansible.cfg
+--
+[defaults]
+inventory=./inventory
+private_key_file=/home/dev/.ssh/dev
+remote_user=ansible
+--
+ansible web-servers -m ping
++---------------------------------------------------+
++---------------------------------------------------+
++---------------------------------------------------+
+install sudo in host 
+----------------------
+apt update -y
+apt install sudo 
+usermod -aG sudo ansible
+
+
+------------
+in master  |
+------------
+ansible web-servers -m command -a "whoami"
+ansible web-servers -m command -a "whoami" --become --ask-become-pass
+
+
+or
+in ansible.cfg
+---------------
+[privilege_escalation]
+become=true
+-------------
+ansible web-servers -m command -a "whoami" --ask-become-pass
+
+
+--------------------------------------------------------------------------
+---------------------------------------------------------------------------
+------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+playbook yaml file
+------------------
+vim first-playbook.yml
+---
+- name: play1
+  hosts: all
+  gather_facts: false  
+  tasks:
+    - name: task1
+      ping: 
+    - name: task2
+      apt:
+        update_cache: true
+    - name: task3
+      apt:
+        name: curl
+        state: present 
+---------
+ansible-playbook first-playbook.yml --ask-become-pass
+
+
+
+---------------------------------------------------------------------------------------------
+tags
+----
+vim tags.yml
+---
+- name: play1
+  hosts: web-servers
+  gather_facts: false  
+  tasks:
+  - name: task1
+    tags: update
+    package:
+      update_cache: true
+
+  - name: task2
+    tags: install
+    package:
+      name: nginx
+      state: latest
+-----------
+ansible-playbook tags.yml --ask-become-pass --tags "update"
+-------------------------------------------
+--------------------------------------------
+---------------------------------------------
+variables
+---------
+vim variable.yml
+---
+- name: play1
+  hosts: web-servers
+  gather_facts: false  
+  vars:
+   package_name: nginx
+   package_state: latest
+   my_arr:
+    - my_first_element
+    - my_second_element
+   tasks:
+
+   - name: task1
+     package:
+      name: "{{ package_name }}"
+      state: "{{ package_state }}"
+--------------
+-----------
+ansible-playbook variable.yml --ask-become-pass
+--------------------------------------------------
+---------------------------------------------------
+------------------------------------------------------
+-------------------------------------------------
+
+loops
+-----
+vim loop.yaml
+---------------------------
+- name: play1
+  hosts: web-servers
+  gather_facts: false  
+  tasks:
+  - name: task1
+    package:
+      name: "{{ item }}"
+      state: latest
+    loop:
+       - nginx
+       - ssh
+       - curl
+----------------------------------------
+ansible-playbook loop.yml --ask-become-pass
+---------------------------------------------
+- name: play1
+  hosts: web-servers
+  gather_facts: false  
+  tasks:
+  - name: task1
+    package:
+      name: "{{ item.name }}"
+      state: "{{ item.state }}"
+    loop:
+      - { name: nginx, state: latest }
+      - { name: ssh, state: present }  
+      - { name: curl, state: absent }
+--------------------------------------------
+ansible-playbook loop.yml --ask-become-pass
+---------------------------------------------
+-----------------
+cat my-var.yaml 
+-----------------
+lista:
+  - nginx
+  - curl
+-------------
+cat loop.yml
+-------------
+- name: play1
+  hosts: web-servers
+  gather_facts: false
+  vars_files:
+    - my-var.yaml 
+  tasks:
+  - name: task1
+    package:
+      name: "{{ item }}"
+      state: latest
+    loop:
+        "{{ lista }}"
+--------------------------------------------------
+ansible-playbook loop.yml --ask-become-pass
+----------------------------------------------------------
+---------------------------------------------------------
+---------------------------------------------------------
+------------------------------------------------------------
+when
+----
+------------------
+vim when.yml
+------------------
+  - name: task1
+    package:
+      name: nginx
+      state: latest
+    when: ansible_facts['distribution'] == "Ubuntu"
+
+  - name: task2
+    package:
+      name: httpd
+      state: latest  
+    when: ansible_facts['distribution'] == "Centos"
+-----------------------------------------------------   
+ansible-playbook when.yml --ask-become-pass
+--------------------------------------------------------
+- name: play1
+  hosts: web-servers
+  gather_facts: true
+  tasks:
+
+  - name: task1
+    package:
+      name: nginx
+      state: latest
+    when: ansible_facts['distribution'] == "Ubuntu"
+
+  - name: task2
+    service:
+      name: nginx
+      state: restarted  
+    when: ansible_facts['distribution'] == "Ubuntu"
+
+  - name: task3
+    package:
+      name: httpd
+      state: latest
+    when: ansible_facts['distribution'] == "CentOS"
+
+  - name: task4
+    service:
+      name: httpd
+      state: restarted
+    when: ansible_facts['distribution'] == "CentOS"
+---------------
+
+--------------
+
+---------------------------------------------------
+--------------------------------------------------------
+----------------------------------------------------------
+register
+--------
+cat register.yml
+------------------
+- name: play1
+  hosts: web-servers
+  gather_facts: true
+  tasks:
+
+  - name: task1
+    command: ls -la
+    register: res
+
+  - name: task2
+    debug: 
+      var: res
+    when: res.changed == false  
+
+----------------------------------------------------      
+ansible-playbook register.yml --ask-become-pass
+-------------------------------------------------------------
+--------------------------------------------------------------
+--------------------------------------------------------------
+----------------------------------------------------------------
+handlers notify
+----------------
+vim handler.yml
+----------------
+- name: play1
+  hosts: web-servers
+  gather_facts: true
+  tasks:
+  - name: task1
+    apt:
+     name: nginx
+    notify: my_handler
+  handlers: 
+  - name: my_handler 
+    service: 
+      name: nginx
+      state: restarted
+--------------------------------------------------
+ansible-playbook handler.yml  --ask-become-pass
+-----------------------------------------------------
+---------------------------------------------------------
+---------------------------------------------------------
+----------------------------------------------------------
+Templete
+---------
+---------------------
+cat templates.yml
+------------------
+- name: play1
+  hosts: web-servers
+  gather_facts: true
+  vars:
+    my_message: hello world
+    my_name: happy new year 2023 and wish you to e good     
+  tasks:
+  - name: temp1
+    template:
+      src: ./index.html.j2 
+      dest: /var/www/html/index.html
+------------------------------------------
+cat index.html.j2
+------------------------------------------
+<html>
+<body>
+<h1> "{{ my_message }}"  </h1>
+<h1> "{{ my_name }}"  </h1>
+</body>
+</html>
+----------------------------------------------------
+ansible-playbook templates.yml  --ask-become-pass
+----------------------------------------------------
+---------------------------------------------------
+------------------------------------------------------
+--------------------------------------------------------
+role
+----
