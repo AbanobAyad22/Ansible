@@ -1,0 +1,8 @@
+package_name: nginx
+files_list: 
+  - index.html
+  - style.css
+  - script.js  
+
+my_message: hello world
+my_name: happy new year from abanob
